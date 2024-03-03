@@ -46,16 +46,16 @@ class Robot:
         self.z = self.true_x
 
         # Rotation PID parameters
-        self.Kp_rot = 2.0
-        self.Ki_rot = 0.0
-        self.Kd_rot = 0.0
+        self.Kp_rot = 1.0
+        self.Ki_rot = 0.3
+        self.Kd_rot = 0.3
         self.previous_error_rot = 0.0
         self.integral_rot = 0.0
 
         # pos PID parameters
-        self.Kp_pos = 0.005
-        self.Ki_pos = 0.001
-        self.Kd_pos = 0.001
+        self.Kp_pos = 0.05
+        self.Ki_pos = 0.005
+        self.Kd_pos = 0.005
         self.previous_error_pos = 0.0
         self.integral_pos = 0.0
 
@@ -117,9 +117,6 @@ class Robot:
         derivative_pos = current_error_pos - self.previous_error_pos
         step_size = self.Kp_pos * current_error_pos + self.Ki_pos * self.integral_pos + self.Kd_pos * derivative_pos
         
-        # Limit step size to a reasonable range
-        if step_size >= 0.5:
-            step_size = 0.5 #limiting speed to 0.5
         self.u_x = step_size
 
     def move_towards(self, target_pos):
@@ -186,7 +183,7 @@ class Robot:
             # Check for completion
             #print("Delta x", abs(self.x_m[0,0] - target_pos[0,0]))
             #print("Delta y", abs(self.x_m[1,0] - target_pos[1,0]))
-            if np.sqrt((self.x_m[0,0] - target_pos[0,0])**2 + (self.x_m[1,0] - target_pos[1,0])**2) < 0.25:
+            if np.sqrt((self.x_m[0,0] - target_pos[0,0])**2 + (self.x_m[1,0] - target_pos[1,0])**2) < 0.5:
                 print(f"Reached target or very close to it in: {k} steps!")
                 break
         
@@ -211,20 +208,20 @@ class Robot:
 
 # Example usage
 if __name__ == '__main__':
-    start_pos = np.array([[0], 
-                          [0]])
+    start_pos = np.array([[87], 
+                          [89]])
     robot = Robot(start_pos=start_pos, start_orientation=0, motor_noise_std=0.002,
                   gps_noise_std=0.5, imu_noise_std= 0.5)
-    target_pos = np.array([[15], 
-                           [10]])
+    target_pos = np.array([[8.5], 
+                           [3.9]])
     steps = 200
     plotting = True
     positions, __, __ = robot.run(target_pos=target_pos, steps=steps, plot = plotting)
 
     # Set up the figure for animation again
     fig, ax = plt.subplots()
-    ax.set_xlim(( -1, 20))
-    ax.set_ylim((-1, 20))
+    ax.set_xlim(( -1, 100))
+    ax.set_ylim((-1, 100))
     line, = ax.plot([], [], 'o-', lw=2)
     target, = ax.plot(target_pos[0, 0], target_pos[1, 0], 'rx', markersize=10)
 
