@@ -1,14 +1,13 @@
 from environment import Environment
 from robot import Robot
-from kalman_filter import KalmanFilter
 import numpy as np
-
+from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 
 # Define constants
-MOTOR_NOISE_STD = 0.1
-GPS_NOISE_STD = 0.1
-IMU_NOISE_STD = 0.1
+MOTOR_NOISE_STD = 1.0
+GPS_NOISE_STD = 2.0
+IMU_NOISE_STD = 2.0
 
 FACTORY_SIZE = 100
 NUM_POINTS = 20
@@ -88,5 +87,32 @@ if __name__ == '__main__':
 
     # Show the updated plot
     plt.show()
-    
+    # Other imports and robot/environment setup as before
+
+    def animate(i):
+        # Clear the current axes.
+        ax.clear()
+        # Optionally, re-plot environment points or other static elements here
+        env.plot_points(ax=ax)  # Assuming this doesn't change
+        
+        # Update the plot for the i-th step
+        # You might need to access pre-computed step data here
+        update_plot(ax, true_positions[i], estimated_positions[i], gps_positions[i], env.points[i])
+        
+        # Update plot limits or perform other necessary updates
+
+    # Initial plot setup
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.set_xlabel('X Position')
+    ax.set_ylabel('Y Position')
+    ax.set_title('Robot Navigation with Kalman Filter')
+
+    # Prepare data for animation
+    # This might involve running the robot simulation and storing results in lists or arrays
+
+    # Create animation
+    ani = FuncAnimation(fig, animate, frames=len(env.points), interval=100)
+
+    plt.show()
+        
 

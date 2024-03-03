@@ -46,15 +46,19 @@ class Robot:
         self.z = self.true_x
 
         # Rotation PID parameters
-        self.Kp_rot = 1.0
-        self.Ki_rot = 0.3
-        self.Kd_rot = 0.3
+        self.Kp_rot = 0.8
+        self.Ki_rot = 0.5
+        self.Kd_rot = 0.00
         self.previous_error_rot = 0.0
         self.integral_rot = 0.0
+        self.previous_orientation = self.x_m[2, 0]
+        self.integral_rot_max = 1.0
+        self.integral_rot_min = - 1.0
+        self.dt = 0.1
 
         # pos PID parameters
-        self.Kp_pos = 0.05
-        self.Ki_pos = 0.005
+        self.Kp_pos = 0.5
+        self.Ki_pos = 0.0
         self.Kd_pos = 0.005
         self.previous_error_pos = 0.0
         self.integral_pos = 0.0
@@ -103,21 +107,37 @@ class Robot:
         #print("Target_pos is", target_pos, "angle error is", current_error*180/3.14)
         #print('current_error is ', current_error)
         self.integral_rot += current_error
+        self.integral_rot = max(min(self.integral_rot, self.integral_rot_max), self.integral_rot_min)
 
-        derivative = current_error - self.previous_error_rot
-        self.u_theta = self.Kp_rot * current_error + self.Ki_rot * self.integral_rot + self.Kd_rot * derivative
+        # Calculate derivative based on measurement change
+        current_orientation = self.x_m[2,0]
+        derivative = (current_orientation - self.previous_orientation) / self.dt
+        self.previous_orientation = current_orientation
+
+        self.u_theta = self.Kp_rot * current_error + self.Ki_rot * self.integral_rot - self.Kd_rot * derivative
         
 
     def move_step_pid_u(self, target_pos):
-        # PID control for step size based on distance to target
-        # A VERIFIER SI LA MANIERE DONT L'ERREUR EST CALCULEE A DU SENS
-        current_error_pos = target_pos[0, 0] + target_pos[1, 0] - (self.x_m[0][0] + self.x_m[1][0])
+        # Calculate the Euclidean distance to the target as the error
+        current_error_pos = np.sqrt((self.x_m[0,0] - target_pos[0,0])**2 + (self.x_m[1,0] - target_pos[1,0])**2)
 
+        # Update the integral of the error
         self.integral_pos += current_error_pos
+        # Calculate the derivative of the error
         derivative_pos = current_error_pos - self.previous_error_pos
+        # PID control for step size based on distance to target
         step_size = self.Kp_pos * current_error_pos + self.Ki_pos * self.integral_pos + self.Kd_pos * derivative_pos
         
+        # Speed adjustment
+        # You may need to adjust the max_speed and min_speed based on your robot's capabilities and testing
+        max_speed = 5.0  # Maximum speed limit
+        min_speed = 0.05  # Minimum speed to prevent too slow movements
+        
+        # Ensure the step size is within the min and max speed limits
+        step_size = max(min(step_size, max_speed), min_speed)
+        
         self.u_x = step_size
+        self.previous_error_pos = current_error_pos
 
     def move_towards(self, target_pos):
         """
@@ -208,12 +228,12 @@ class Robot:
 
 # Example usage
 if __name__ == '__main__':
-    start_pos = np.array([[87], 
-                          [89]])
-    robot = Robot(start_pos=start_pos, start_orientation=0, motor_noise_std=0.002,
-                  gps_noise_std=0.5, imu_noise_std= 0.5)
-    target_pos = np.array([[8.5], 
-                           [3.9]])
+    start_pos = np.array([[8.5], 
+                          [3.9]])
+    robot = Robot(start_pos=start_pos, start_orientation=0, motor_noise_std=0.00002,
+                  gps_noise_std=0.0005, imu_noise_std= 0.00005)
+    target_pos = np.array([[17], 
+                           [87]])
     steps = 200
     plotting = True
     positions, __, __ = robot.run(target_pos=target_pos, steps=steps, plot = plotting)
