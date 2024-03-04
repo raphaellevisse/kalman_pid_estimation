@@ -48,7 +48,7 @@ class Robot:
         # Rotation PID parameters
         self.Kp_rot = 0.8
         self.Ki_rot = 0.5
-        self.Kd_rot = 0.00
+        self.Kd_rot = 0.0001
         self.previous_error_rot = 0.0
         self.integral_rot = 0.0
         self.previous_orientation = self.x_m[2, 0]
@@ -194,7 +194,7 @@ class Robot:
             # Perform Kalman filter prediction and update
             self.predict()
             self.update()
-
+            
             # Store the positions
             estimated_positions.append(self.x_m[:2, 0].copy())
             true_positions.append(self.true_x[:2, 0].copy())
@@ -230,8 +230,8 @@ class Robot:
 if __name__ == '__main__':
     start_pos = np.array([[8.5], 
                           [3.9]])
-    robot = Robot(start_pos=start_pos, start_orientation=0, motor_noise_std=0.00002,
-                  gps_noise_std=0.0005, imu_noise_std= 0.00005)
+    robot = Robot(start_pos=start_pos, start_orientation=0, motor_noise_std=0.,
+                  gps_noise_std=0.8, imu_noise_std= 0.2)
     target_pos = np.array([[17], 
                            [87]])
     steps = 200

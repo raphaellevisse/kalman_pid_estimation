@@ -5,12 +5,12 @@ from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 
 # Define constants
-MOTOR_NOISE_STD = 1.0
-GPS_NOISE_STD = 2.0
-IMU_NOISE_STD = 2.0
+MOTOR_NOISE_STD = 0.6
+GPS_NOISE_STD = 0.8
+IMU_NOISE_STD = 0.2
 
 FACTORY_SIZE = 100
-NUM_POINTS = 20
+NUM_POINTS = 5
 
 START_POINT = np.array([[0], [0]])
 START_ORIENTATION = float(0)
@@ -34,7 +34,8 @@ if __name__ == '__main__':
         ax.plot(np.array(estimated_positions)[:, 0], np.array(estimated_positions)[:, 1], 'b--', label='Kalman Filter Estimate' if len(ax.lines) == 0 else "")
         ax.plot(np.array(gps_positions)[:, 0], np.array(gps_positions)[:, 1], 'r:', label='Unfiltered Estimate' if len(ax.lines) == 0 else "")
         ax.plot(target_pos[0], target_pos[1], 'go', label='Target' if len(ax.lines) == 0 else "")
-
+        
+        
         # If it's the first time, add the legend
         if len(ax.lines) == 4:  # Only add legend once
             ax.legend()
@@ -86,33 +87,6 @@ if __name__ == '__main__':
     ax.set_ylim(current_ylim)
 
     # Show the updated plot
-    plt.show()
-    # Other imports and robot/environment setup as before
-
-    def animate(i):
-        # Clear the current axes.
-        ax.clear()
-        # Optionally, re-plot environment points or other static elements here
-        env.plot_points(ax=ax)  # Assuming this doesn't change
-        
-        # Update the plot for the i-th step
-        # You might need to access pre-computed step data here
-        update_plot(ax, true_positions[i], estimated_positions[i], gps_positions[i], env.points[i])
-        
-        # Update plot limits or perform other necessary updates
-
-    # Initial plot setup
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.set_xlabel('X Position')
-    ax.set_ylabel('Y Position')
-    ax.set_title('Robot Navigation with Kalman Filter')
-
-    # Prepare data for animation
-    # This might involve running the robot simulation and storing results in lists or arrays
-
-    # Create animation
-    ani = FuncAnimation(fig, animate, frames=len(env.points), interval=100)
-
     plt.show()
         
 
