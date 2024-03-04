@@ -1,8 +1,10 @@
 from environment import Environment
 from robot import Robot
 import numpy as np
-from matplotlib.animation import FuncAnimation
+import matplotlib.animation as animation
 import matplotlib.pyplot as plt
+
+from matplotlib.widgets import Slider
 
 # Define constants
 MOTOR_NOISE_STD = 0.6
@@ -48,12 +50,14 @@ if __name__ == '__main__':
     ax.set_ylabel('Y Position')
     ax.set_title('Robot Navigation with Kalman Filter')
     env.plot_points(ax=ax)  # Plot the points
-
+    positions = [np.array([0, 0])]
     # Run the robot for each target position and update the plot
+    
     for target in env.points:
         print("target is: ", target)
         target_pos = target.reshape(2, 1)
         estimated_positions, true_positions, gps_positions = robot.run(target_pos=target_pos, steps=500, plot=False)
+        positions = positions + estimated_positions
         update_plot(ax, true_positions, estimated_positions, gps_positions, target_pos)
 
     
@@ -88,5 +92,123 @@ if __name__ == '__main__':
 
     # Show the updated plot
     plt.show()
+    
+
+    # Set up the figure for animation again
+        # Setup the figure and axis for the plot and sliders
+    fig, ax = plt.subplots()
+    plt.subplots_adjust(left=0.1, bottom=0.35)  # Adjust to make room for sliders  # Adjust to make room for sliders
+
+    # Setup plot limits and initial plot elements
+    ax.set_xlim((-1, 100))
+    ax.set_ylim((-1, 100))
+    line, = ax.plot([], [], 'o-', lw=2)
+
+    # Initialize an empty target marker
+
+    target, = ax.plot([], [], 'rx', markersize=10)  # Empty plot for the target marker
+
+    axcolor = 'lightgoldenrodyellow'
+    ax_noise_motor = plt.axes([0.1, 0.05, 0.65, 0.03], facecolor= axcolor)
+    ax_noise_gps = plt.axes([0.1, 0.00, 0.65, 0.03], facecolor= axcolor)
+    ax_noise_imu = plt.axes([0.1, 0.10, 0.65, 0.03], facecolor= axcolor)  # Place IMU noise slider after GPS noise slider
+
+    s_noise_motor = Slider(ax_noise_motor, 'Motor Noise Std', 0.0001, 5.0, valinit=robot.motor_noise_std)
+    s_noise_gps = Slider(ax_noise_gps, 'GPS Noise Std', 0.0001, 5.0, valinit=robot.gps_noise_std)
+    s_noise_imu = Slider(ax_noise_imu, 'IMU Noise Std', 0.0001, 5.0, valinit=robot.imu_noise_std)
+
+    # Update functions for noise sliders
+    def update_noise_motor(val):
+        robot.motor_noise_std = val
+        robot.Q = np.diag([val**2, val**2, val**2])  # Update the process noise covariance matrix accordingly
+
+    def update_noise_gps(val):
+        robot.gps_noise_std = val
+        robot.R[0, 0] = val**2
+        robot.R[1, 1] = val**2  # Assuming you want to update GPS noise std in R matrix
+
+    def update_noise_imu(val):
+        robot.motor_noise_std = val
+        robot.R[2,2] = val**2
+
+    s_noise_motor.on_changed(update_noise_motor)
+    s_noise_gps.on_changed(update_noise_gps)
+    s_noise_imu.on_changed(update_noise_imu)
+                           
         
+    # Add sliders for PID gains
+    ax_kp = plt.axes([0.1, 0.2, 0.65, 0.03], facecolor=axcolor)
+    ax_ki = plt.axes([0.1, 0.15, 0.65, 0.03], facecolor=axcolor)
+    ax_kd = plt.axes([0.1, 0.25, 0.65, 0.03], facecolor=axcolor)  # Adjust positions as necessary
+
+    s_kp = Slider(ax_kp, 'Kp', 0.0, 10.0, valinit=robot.Kp_rot)
+    s_ki = Slider(ax_ki, 'Ki', 0.0, 10.0, valinit=robot.Ki_rot)
+    s_kd = Slider(ax_kd, 'Kd', 0.0, 10.0, valinit=robot.Kd_rot)
+    # Slider update functions
+    def update_kp(val):
+        robot.Kp_rot = val
+    s_kp.on_changed(update_kp)
+
+    def update_ki(val):
+        robot.Ki_rot = val
+    s_ki.on_changed(update_ki)
+
+    def update_kd(val):
+        robot.Kd_rot = val
+    s_kd.on_changed(update_kd)
+
+    # Initialize function for the animation
+    def init():
+        line.set_data([], [])
+        return (line,)
+
+    # Initialize lists to store positions
+    xdata, ydata = [], []
+
+        # Initialize target position with None or an initial value
+    target_pos = None
+
+    # Function to handle mouse click events
+    def onclick(event):
+        global target_pos
+        print(event)
+        if event.xdata is not None and event.ydata is not None and 0 <= event.xdata <= 100 and 0 <= event.ydata <= 100:
+            # Update target_pos with the coordinates of the click event
+            target_pos = np.array([[event.xdata], [event.ydata]])
+            # Update the target marker to the new position
+            target.set_data([event.xdata], [event.ydata])
+            print(f"New target position: {target_pos.T}")
+        else:
+            print("Click was outside the grid. No action taken.")
+    
+    # Connect the click event handler to the figure
+    fig.canvas.mpl_connect('button_press_event', onclick)
+
+    def animate(i):
+        global target_pos, xdata, ydata
+
+        # Check if a target position has been set by a user click
+        if target_pos is not None:
+            # Append current position to the lists
+            xdata.append(robot.x_m[0, 0])
+            ydata.append(robot.x_m[1, 0])
+
+            # Check if the robot is close enough to the target position
+            if np.sqrt((robot.x_m[0, 0] - target_pos[0, 0])**2 + (robot.x_m[1, 0] - target_pos[1, 0])**2) > 0.5:
+                # If not, continue moving the robot towards the target position
+                robot.step_run(target_pos)
+            else:
+                # Optionally, you can handle what happens once the target is reached here
+                # For example, you might clear the target_pos or take some other action
+                print("Reached the target position.")
+                # target_pos = None  # Uncomment if you wish to clear the target after reaching it
+
+        # Update the line with all previous positions
+        line.set_data(xdata, ydata)
+        return (line,)
+    
+    anim = animation.FuncAnimation(fig, animate, init_func=init,
+                                frames=len(positions), interval=200, blit=False)
+    plt.show()
+
 

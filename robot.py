@@ -46,9 +46,9 @@ class Robot:
         self.z = self.true_x
 
         # Rotation PID parameters
-        self.Kp_rot = 0.8
-        self.Ki_rot = 0.5
-        self.Kd_rot = 0.0001
+        self.Kp_rot = 0.9
+        self.Ki_rot = 0.01
+        self.Kd_rot = 0.000
         self.previous_error_rot = 0.0
         self.integral_rot = 0.0
         self.previous_orientation = self.x_m[2, 0]
@@ -66,8 +66,6 @@ class Robot:
     def calculate_distance_to_target(self, target_pos):
         return np.linalg.norm(target_pos - self.x_m)
     
-    
-
     def calculate_estimated_angle_to_target(self, target_pos):
         """
         Calculates the angle from the current position to the target position.
@@ -103,6 +101,7 @@ class Robot:
         self.previous_error_rot = current_error
     
     def rot_step_pid_u(self, target_pos):
+        print(self.calculate_estimated_angle_to_target(target_pos))
         current_error = self.calculate_estimated_angle_to_target(target_pos) - self.x_m[2,0]
         #print("Target_pos is", target_pos, "angle error is", current_error*180/3.14)
         #print('current_error is ', current_error)
@@ -115,6 +114,7 @@ class Robot:
         self.previous_orientation = current_orientation
 
         self.u_theta = self.Kp_rot * current_error + self.Ki_rot * self.integral_rot - self.Kd_rot * derivative
+        print(self.u_theta)
         
 
     def move_step_pid_u(self, target_pos):
@@ -171,7 +171,29 @@ class Robot:
         Simulates the sensing of the orientation with added noise.
         """
         self.z[2, 0] = self.true_x[2,0] + np.random.normal(0, self.imu_noise_std)
-    
+
+    def step_run(self, target_pos) -> np.ndarray:
+        if np.sqrt((self.x_m[0,0] - target_pos[0,0])**2 + (self.x_m[1,0] - target_pos[1,0])**2) < 0.5:
+            print(f"Reached target or very close to it !")
+        else:
+            # Update control inputs using PID
+            self.rot_step_pid_u(target_pos)
+            self.move_step_pid_u(target_pos)
+
+            # Apply process noise and move the robot
+            process_noise = self.process_noise()
+            self.true_x = self.A @ self.true_x + process_noise + self.B @ np.array([[self.u_x*np.cos(self.x_m[2,0])],
+                                                                                        [self.u_x*np.sin(self.x_m[2,0])],
+                                                                                        [self.u_theta]])
+            
+            # Simulate sensor measurements
+            self.gps_measure()
+            self.imu_sensor()
+
+            # Perform Kalman filter prediction and update
+            self.predict()
+            self.update()
+
     def run(self, target_pos, steps=100, plot = False):
         estimated_positions = [self.x_m[:2, 0].copy()]  # Kalman filter estimates
         true_positions = [self.true_x[:2, 0].copy()]    # True positions
@@ -230,8 +252,8 @@ class Robot:
 if __name__ == '__main__':
     start_pos = np.array([[8.5], 
                           [3.9]])
-    robot = Robot(start_pos=start_pos, start_orientation=0, motor_noise_std=0.,
-                  gps_noise_std=0.8, imu_noise_std= 0.2)
+    robot = Robot(start_pos=start_pos, start_orientation=0, motor_noise_std=0.00020,
+                  gps_noise_std=0.00008, imu_noise_std= 0.000005)
     target_pos = np.array([[17], 
                            [87]])
     steps = 200
@@ -239,18 +261,22 @@ if __name__ == '__main__':
     positions, __, __ = robot.run(target_pos=target_pos, steps=steps, plot = plotting)
 
     # Set up the figure for animation again
+    # Setup the figure and axis for the plot and sliders
     fig, ax = plt.subplots()
-    ax.set_xlim(( -1, 100))
+
+    # Setup plot limits and initial plot elements
+    ax.set_xlim((-1, 100))
     ax.set_ylim((-1, 100))
     line, = ax.plot([], [], 'o-', lw=2)
     target, = ax.plot(target_pos[0, 0], target_pos[1, 0], 'rx', markersize=10)
 
     # Initialize animation
+    
     def init():
         line.set_data([], [])
         target.set_data([target_pos[0]], [target_pos[1]])
         return (line, target)
-
+    
     # Define animation function
     def animate(i):
         xdata = [pos[0] for pos in positions[:i+1]]
