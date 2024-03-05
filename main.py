@@ -7,16 +7,16 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 
 # Define constants
-MOTOR_NOISE_STD = 0.6
-GPS_NOISE_STD = 0.8
+MOTOR_NOISE_STD = 0.2
+GPS_NOISE_STD = 2.5
 IMU_NOISE_STD = 0.2
 
-FACTORY_SIZE = 1000
+FACTORY_SIZE = 50
 NUM_POINTS = 5
-OBSTACLE_COUNT = 5
+OBSTACLE_COUNT = 30
 
 
-START_POINT = np.array([[FACTORY_SIZE/2], [FACTORY_SIZE/2]])
+START_POINT = np.array([[0*FACTORY_SIZE/2], [0*FACTORY_SIZE/2]])
 START_ORIENTATION = float(0)
 INITIAL_STATE = START_POINT
 INITIAL_COVARIANCE = np.array([[1, 0],[0, 1]])
@@ -27,7 +27,7 @@ robot = Robot(START_POINT, START_ORIENTATION, MOTOR_NOISE_STD, GPS_NOISE_STD, IM
 env = Environment(FACTORY_SIZE, NUM_POINTS, OBSTACLE_COUNT)
 
 grid = env.generate_grid()
-print(grid)
+
 
 
 if __name__ == '__main__':
@@ -35,12 +35,16 @@ if __name__ == '__main__':
         # Setup the figure and axis for the plot and sliders
     fig, ax = plt.subplots()
     plt.subplots_adjust(left=0.1, bottom=0.35)  # Adjust to make room for sliders  # Adjust to make room for sliders
+    # Initialize an empty line for the A* path
+    astar_path_line, = ax.plot([], [], 'g--', lw=1, label='A* Path')  # Green dashed line for A* path
 
     # Setup plot limits and initial plot elements
     ax.set_xlim((-1, FACTORY_SIZE))
     ax.set_ylim((-1, FACTORY_SIZE))
     line, = ax.plot([], [], 'o-', lw=2)
-
+        # Display the grid with obstacles
+    # Normalize grid values to [0,1] for displaying as an image
+    ax.imshow(grid.T, origin='lower', cmap='gray', extent=[-1, FACTORY_SIZE, -1, FACTORY_SIZE], alpha=0.5)
     # Initialize an empty target marker
 
     target, = ax.plot([], [], 'rx', markersize=10)  # Empty plot for the target marker
@@ -50,7 +54,7 @@ if __name__ == '__main__':
     ax_noise_gps = plt.axes([0.1, 0.00, 0.65, 0.03], facecolor= axcolor)
     ax_noise_imu = plt.axes([0.1, 0.10, 0.65, 0.03], facecolor= axcolor)  # Place IMU noise slider after GPS noise slider
 
-    s_noise_motor = Slider(ax_noise_motor, 'Motor Noise Std', 0.0001, 5.0, valinit=robot.motor_noise_std)
+    s_noise_motor = Slider(ax_noise_motor, 'Motor Noise Std', 0.0001, 1.0, valinit=robot.motor_noise_std)
     s_noise_gps = Slider(ax_noise_gps, 'GPS Noise Std', 0.0001, 10.0, valinit=robot.gps_noise_std)
     s_noise_imu = Slider(ax_noise_imu, 'IMU Noise Std', 0.0001, 10.0, valinit=robot.imu_noise_std)
 
@@ -114,51 +118,60 @@ if __name__ == '__main__':
 
     # Function to handle mouse click events
     def onclick(event):
-        global target_pos
-        # Check if the click was within the main plot axis
+        global target_pos, path, current_waypoint_index
         if event.inaxes == ax:
-            if event.xdata is not None and event.ydata is not None and 0 <= event.xdata <= FACTORY_SIZE and 0 <= event.ydata <= FACTORY_SIZE:
-                # Update target_pos with the coordinates of the click event
-                target_pos = np.array([[event.xdata], [event.ydata]])
-                # Update the target marker to the new position
-                target.set_data([event.xdata], [event.ydata])
-                print(f"New target position: {target_pos.T}")
-                fig.canvas.draw()  # Force the figure to redraw with the new target
+            x, y = int(event.xdata), int(event.ydata)
+            if 0 <= x < FACTORY_SIZE and 0 <= y < FACTORY_SIZE and grid[y, x] == 0:
+                start_pos = (int(robot.x_m[0, 0]), int(robot.x_m[1, 0]))  # Get robot's current position
+                target_pos = np.array([[x], [y]])
+                path = env.find_path(start_pos, (x, y), grid)  # Find the new path
+                current_waypoint_index = 0  # Reset the waypoint index for the new path
+                
+                # Update the A* path line data
+                if path:
+                    astar_path_line.set_data(*zip(*path))
+                else:
+                    astar_path_line.set_data([], [])
+                    
+                target.set_data([x], [y])
+                fig.canvas.draw()
             else:
-                print("Click was outside the grid. No action taken.")
-        else:
-            # If the click is not within the main plot axis, do nothing
-            print("Click was on a non-plot element, likely a slider. No action taken.")
-        
+                print("Clicked on an obstacle or outside the grid.")
+
     # Connect the click event handler to the figure
     fig.canvas.mpl_connect('button_press_event', onclick)
 
+    current_waypoint_index = 0  # Initialize a waypoint index
+    path = []
     def animate(i):
-        global target_pos, xdata, ydata, true_xdata, true_ydata, z_xdata, z_ydata
-
-        if target_pos is not None:
-            # Append current position to the lists
-            xdata.append(robot.x_m[0, 0])
-            ydata.append(robot.x_m[1, 0])
+        global target_pos, xdata, ydata, true_xdata, true_ydata, z_xdata, z_ydata, path, current_waypoint_index
+    
+        if path and current_waypoint_index < len(path):
+            next_waypoint = path[current_waypoint_index]
+            target_pos = np.array([[next_waypoint[0]], [next_waypoint[1]]])
             
-            # Append true position and measurement data
-            true_xdata.append(robot.true_x[0, 0])
-            true_ydata.append(robot.true_x[1, 0])
-            z_xdata.append(robot.z[0, 0])
-            z_ydata.append(robot.z[1, 0])
+            if np.linalg.norm(robot.x_m[:2] - target_pos) < 0.5:  # Check if close to the current waypoint
+                current_waypoint_index += 1  # Proceed to the next waypoint
 
-            if np.sqrt((robot.x_m[0, 0] - target_pos[0, 0])**2 + (robot.x_m[1, 0] - target_pos[1, 0])**2) > 0.5:
-                robot.step_run(target_pos)
-            else:
-                print("Reached the target position.")
+        # Move the robot towards the current waypoint
+        if current_waypoint_index < len(path):
+            robot.step_run(target_pos)
 
-        # Update the lines with the new data
+        # Update robot's trail and measurements on the plot
+        xdata.append(robot.x_m[0, 0])
+        ydata.append(robot.x_m[1, 0])
+        true_xdata.append(robot.true_x[0, 0])
+        true_ydata.append(robot.true_x[1, 0])
+        z_xdata.append(robot.z[0, 0])
+        z_ydata.append(robot.z[1, 0])
+
         line.set_data(xdata, ydata)
         true_line.set_data(true_xdata, true_ydata)
         z_line.set_data(z_xdata, z_ydata)
 
-        return line, true_line, z_line
-    
+        return line, true_line, z_line, astar_path_line
+
+
     anim = animation.FuncAnimation(fig, animate, init_func=init,
                                 frames=1000, interval=200, blit=False)
     plt.show()

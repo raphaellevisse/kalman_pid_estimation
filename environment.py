@@ -27,7 +27,7 @@ class Environment:
         for _ in range(self.obstacle_count):
             # Randomly place rectangular obstacles
             x, y = np.random.randint(0, self.grid_size, 2)
-            width, height = np.random.randint(10, 100, 2)
+            width, height = np.random.randint(1, self.grid_size//6, 2)
             grid[max(0, x-width//2):min(self.grid_size, x+width//2), max(0, y-height//2):min(self.grid_size, y+height//2)] = 1
         return grid
     
@@ -46,10 +46,10 @@ class Environment:
                     neighbors.append(neighbor)
         return neighbors
     
-    def find_path(start, goal, grid):
+    def find_path(self, start, goal, grid):
         """Find path from start to goal using A* with diagonal movement allowed"""
         open_set = []
-        heapq.heappush(open_set, (0 + heuristic(start, goal), 0, start))
+        heapq.heappush(open_set, (0 + self.heuristic(start, goal), 0, start))
         came_from = {}
         g_score = {start: 0}
         
@@ -65,7 +65,7 @@ class Environment:
                 path.reverse()
                 return path
             
-            for neighbor in find_neighbors(grid, current):
+            for neighbor in self.find_neighbors(grid, current):
                 # Adjust movement cost based on whether the move is diagonal
                 if abs(neighbor[0] - current[0]) == 1 and abs(neighbor[1] - current[1]) == 1:
                     movement_cost = np.sqrt(2)  # Diagonal movement cost
@@ -77,7 +77,7 @@ class Environment:
                 if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g_score
-                    f_score = tentative_g_score + heuristic(neighbor, goal)
+                    f_score = tentative_g_score + self.heuristic(neighbor, goal)
                     heapq.heappush(open_set, (f_score, tentative_g_score, neighbor))
                     
         return []
