@@ -101,7 +101,7 @@ class Robot:
         self.previous_error_rot = current_error
     
     def rot_step_pid_u(self, target_pos):
-        print(self.calculate_estimated_angle_to_target(target_pos))
+        #print(self.calculate_estimated_angle_to_target(target_pos))
         current_error = self.calculate_estimated_angle_to_target(target_pos) - self.x_m[2,0]
         #print("Target_pos is", target_pos, "angle error is", current_error*180/3.14)
         #print('current_error is ', current_error)
@@ -114,7 +114,7 @@ class Robot:
         self.previous_orientation = current_orientation
 
         self.u_theta = self.Kp_rot * current_error + self.Ki_rot * self.integral_rot - self.Kd_rot * derivative
-        print(self.u_theta)
+        #print(self.u_theta)
         
 
     def move_step_pid_u(self, target_pos):
@@ -130,7 +130,7 @@ class Robot:
         
         # Speed adjustment
         # You may need to adjust the max_speed and min_speed based on your robot's capabilities and testing
-        max_speed = 5.0  # Maximum speed limit
+        max_speed = 20.0  # Maximum speed limit
         min_speed = 0.05  # Minimum speed to prevent too slow movements
         
         # Ensure the step size is within the min and max speed limits
