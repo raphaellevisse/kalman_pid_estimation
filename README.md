@@ -5,5 +5,6 @@ Ongoing personal hobby project using Kalman filters and PID controllers, with di
 Just launch main.py and you can adjust the different parameters influencing movement. We see the use of Kalman filtering here as gps information in red is noisy, we rely on process noise and our knowledge of the vehicle equations to derive a reliable robot.
 
 In actual version, I simulate a randomised factory floor, on which the robot uses A* star algorithm to go to a point given by the user by clicking on the grid.
-![image](https://github.com/raphaellevisse/kalman_pid_estimation/assets/143650581/518ec24a-38ae-47f9-954e-24c41afa7a35)
+![full_photo](https://github.com/raphaellevisse/kalman_pid_estimation/assets/143650581/6c455efe-2467-453c-9dcb-61b829fca217)
+
 
